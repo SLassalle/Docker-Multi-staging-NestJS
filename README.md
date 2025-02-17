@@ -37,7 +37,7 @@ CMD ["npm", "run", "start:dev", "--", "--host", "0.0.0.0"]
 On peut maintenant construire l'image Docker.
 
 ```bash
-docker build --tag my-app:development --file ./my-nest-js/Dockerfile.development ./my-app
+docker build --tag my-app:development --file ./my-nest-js/Dockerfile.development ./my-nest-js
 ```
 
 On peut maintenant démarrer un conteneur Docker avec l'image créée.
@@ -78,7 +78,7 @@ Contrairement aux volumes, Docker Compose Watch permet de synchroniser les modif
 On peut maintenant démarrer le conteneur Docker avec Docker Compose Watch.
 
 ```bash
-docker-compose --file compose.development.yml up --build --watch
+docker compose --file compose.development.yml up --build --watch
 ```
 
 En ignorant (via le `.dockerignore`) le dossier `node_modules`, on peut éviter de synchroniser les dépendances du conteneur Docker avec le code source (évitant les potentiels conflits).
@@ -106,3 +106,80 @@ docker commit <container_id> my-app:development
 ---
 
 Lorsque l'on souhaitera déployer, on favorisera une image dédiée à la production, plus légère, contenant uniquement le résultat de la construction de l'application et le serveur web. On n'a pas besoin d'avoir les dépendances de développement dans l'image de production, ainsi que l'ensemble des outils de développement.
+
+> 💡 Le multi-staging est utilisé pour créer des images Docker plus légères en séparant les étapes de développement et de production. Cela permet de réduire la taille des images finales en n’incluant que ce qui est nécessaire pour exécuter l’application.
+
+### Création d'une image dédiée à la production
+
+On va créer une image Docker pour l'application React.js en mode production. Pour cela, on crée un fichier `Dockerfile à la racine du projet.
+
+```bash
+
+```Dockerfile
+FROM node:latest AS builder
+
+WORKDIR /app
+
+COPY ./package.json .
+
+RUN npm install
+
+COPY . .
+
+RUN npm run build
+
+
+FROM oven/bun:alpine AS server
+
+WORKDIR /app
+
+COPY --from=builder /app/dist ./dist
+
+COPY ./package.json .
+
+RUN bun install --production
+
+CMD ["bun", "dist/main"]
+```
+
+Le premier stage correspond à l'étape de construction de l'application, et le second stage correspond à l'étape de déploiement de l'application via le runtime Bun.
+
+> 💡 Pour tirer le meilleur parti du multi-staging, minimisez les couches dans chaque étape et utilisez des images de base légères. Assurez-vous également de nettoyer les fichiers temporaires et inutiles pour optimiser la taille de l’image.
+
+On peut maintenant construire l'image Docker.
+
+```bash
+docker build --tag my-app:production ./my-nest-js
+```
+
+On peut maintenant démarrer un conteneur Docker avec l'image créée.
+
+```bash
+docker run --publish 3000:3000 my-app:production
+```
+
+## Comparaisons
+
+En faisant un `docker images`, on peut comparer les images Docker créées.
+
+```bash
+docker images
+```
+
+```
+REPOSITORY      TAG           IMAGE ID       CREATED              SIZE
+react-app   production    ...            ...                  75.7MB
+react-app   development   ...            ...                  2.03GB
+```
+
+On peut voir que l'image de production est beaucoup plus légère que l'image de développement. Seul le runtime Bun (avec l'application pré-construite) est présent dans l'image de production, alors que l'image de développement contient l'ensemble des dépendances de développement. Uniquement l'image de base pour la seconde étape (`server`) est présente dans l'image de production.
+
+> 💡 Dans un Dockerfile traditionnel, toutes les opérations sont effectuées dans un seul conteneur, ce qui peut entraîner des images volumineuses et complexes. Le multi-staging, en revanche, permet de diviser le processus de construction en étapes distinctes, optimisant ainsi l’image finale.
+
+## Conclusion
+
+Le multi-staging permet de créer des images Docker plus légères et sécurisées.
+
+En séparant les étapes de développement et de production, on optimise les performances et réduit les risques en production.
+
+C'est une pratique essentielle pour tout développeur cherchant à améliorer ses workflows Docker.
