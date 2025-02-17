@@ -183,3 +183,49 @@ Le multi-staging permet de créer des images Docker plus légères et sécurisé
 En séparant les étapes de développement et de production, on optimise les performances et réduit les risques en production.
 
 C'est une pratique essentielle pour tout développeur cherchant à améliorer ses workflows Docker.
+
+## Exemple avec une application Python
+
+### Création d'un Dockerfile multi-staging
+
+Créez un premier stage pour installer les dépendances et préparer l'environnement de développement :
+
+```Dockerfile
+FROM python:3.10 AS builder
+
+# Installer les dépendances système nécessaires :
+RUN apt-get update && apt-get install -y build-essential
+
+WORKDIR /app
+
+COPY requirements.txt ./
+
+# Installer les dépendances :
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copier le reste des fichiers :
+COPY ./ ./
+
+# Construire l'application (si nécessaire, par ex. compilation Cython) :
+RUN python setup.py build
+```
+
+Créez un second stage minimaliste pour exécuter l'application :
+
+```Dockerfile
+FROM python:3.10-slim AS server
+
+WORKDIR /app
+
+# Copier uniquement les fichiers nécessaires depuis le stage précédent :
+COPY --from=builder /app /app
+
+# Installer uniquement les dépendances nécessaires à la production :
+RUN pip install --no-cache-dir -r requirements.txt --only-binary=:all:
+
+# Commande par défaut pour démarrer l'application :
+CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:8000", "app:app"]
+```
+
+Le premier stage utilise une image complète avec tous les outils nécessaires à la construction.
+Le second stage utilise une image légère (slim) et ne conserve que ce qui est indispensable à l'exécution.
