@@ -1,0 +1,18 @@
+services:
+  my-app:
+    image: my-app:development
+    build:
+      context: ./my-nest-js
+      dockerfile: Dockerfile.development
+    ports:
+      - "3000:3000"
+    develop:
+      watch:
+        - action: sync
+          path: ./my-nest-js/src
+          target: /app/src
+        - action: sync+restart
+          path: ./my-nest-js
+          target: /app
+        - action: rebuild
+          path: ./my-nest-js/package.json
