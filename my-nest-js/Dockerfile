@@ -1,21 +1,27 @@
-FROM node:latest AS builder
+FROM node:latest AS base
 
 WORKDIR /app
 
-COPY ./package.json .
+COPY ./package.json ./
 
 RUN npm install
 
-COPY . .
+COPY ./ ./
+
+
+FROM base AS development
+
+CMD ["npm", "run", "start:dev", "--", "--host", "0.0.0.0"]
+
+
+FROM base AS build
 
 RUN npm run build
 
 
-FROM oven/bun:alpine AS server
+FROM oven/bun:alpine AS production
 
-WORKDIR /app
-
-COPY --from=builder /app/dist ./dist
+COPY --from=build /app/dist ./dist
 
 COPY ./package.json .
 

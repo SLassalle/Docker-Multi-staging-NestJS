@@ -1,11 +1,12 @@
 services:
   my-app:
-    image: my-app:development
     build:
       context: ./my-nest-js
-      dockerfile: Dockerfile.development
+      dockerfile: Dockerfile
+      target: ${ENVIRONMENT}
     ports:
       - "3000:3000"
+      - "80:80"
     develop:
       watch:
         - action: sync
